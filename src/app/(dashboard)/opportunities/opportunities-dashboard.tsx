@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Briefcase,
   Calendar,
@@ -36,6 +37,49 @@ const STATUS_FILTERS: Array<{ label: string; value: "all" | OpportunityStatus }>
 ];
 
 const PAGE_SIZE = 12;
+
+type OpportunityQueryState = {
+  searchInput: string;
+  search: string;
+  status: "all" | OpportunityStatus;
+  category: string;
+  page: number;
+};
+
+function parseOpportunityQuery(searchParams: { get(name: string): string | null }): OpportunityQueryState {
+  const search = searchParams.get("search")?.trim() ?? "";
+  const statusParam = searchParams.get("status") ?? "all";
+  const category = searchParams.get("category")?.trim() ?? "all";
+  const pageParam = Number.parseInt(searchParams.get("page") ?? "1", 10);
+
+  const allowedStatuses = new Set<string>([
+    "all",
+    OPPORTUNITY_STATUS.NEW,
+    OPPORTUNITY_STATUS.SAVED,
+    OPPORTUNITY_STATUS.APPLIED,
+    OPPORTUNITY_STATUS.ACCEPTED,
+    OPPORTUNITY_STATUS.REJECTED,
+  ]);
+
+  return {
+    searchInput: search,
+    search,
+    status: allowedStatuses.has(statusParam) ? (statusParam as OpportunityQueryState["status"]) : "all",
+    category: category || "all",
+    page: Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1,
+  };
+}
+
+function buildOpportunityQueryString(state: OpportunityQueryState): string {
+  const params = new URLSearchParams();
+
+  if (state.search) params.set("search", state.search);
+  if (state.status !== "all") params.set("status", state.status);
+  if (state.category !== "all") params.set("category", state.category);
+  if (state.page > 1) params.set("page", String(state.page));
+
+  return params.toString();
+}
 
 function statusBadgeVariant(status: OpportunityStatus):
   | "new"
@@ -217,11 +261,16 @@ function OpportunityCard({ opportunity }: { opportunity: Opportunity }) {
 }
 
 export default function OpportunitiesDashboard() {
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"all" | OpportunityStatus>("all");
-  const [category, setCategory] = useState<string>("all");
-  const [page, setPage] = useState(1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialQuery = useMemo(() => parseOpportunityQuery(searchParams), [searchParams]);
+
+  const [searchInput, setSearchInput] = useState(initialQuery.searchInput);
+  const [search, setSearch] = useState(initialQuery.search);
+  const [status, setStatus] = useState<"all" | OpportunityStatus>(initialQuery.status);
+  const [category, setCategory] = useState<string>(initialQuery.category);
+  const [page, setPage] = useState(initialQuery.page);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -231,6 +280,31 @@ export default function OpportunitiesDashboard() {
 
     return () => window.clearTimeout(timeout);
   }, [searchInput]);
+
+  useEffect(() => {
+    const nextQuery = parseOpportunityQuery(searchParams);
+
+    setSearchInput((current) => (current === nextQuery.searchInput ? current : nextQuery.searchInput));
+    setSearch((current) => (current === nextQuery.search ? current : nextQuery.search));
+    setStatus((current) => (current === nextQuery.status ? current : nextQuery.status));
+    setCategory((current) => (current === nextQuery.category ? current : nextQuery.category));
+    setPage((current) => (current === nextQuery.page ? current : nextQuery.page));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const nextQueryString = buildOpportunityQueryString({
+      search,
+      status,
+      category,
+      page,
+    });
+
+    const currentQueryString = searchParams.toString();
+    if (nextQueryString === currentQueryString) return;
+
+    const nextUrl = nextQueryString ? `${pathname}?${nextQueryString}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [category, page, pathname, router, search, searchParams, status]);
 
   const params = useMemo(() => {
     return {

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell, Moon, Sun, Search } from "lucide-react";
+import { Bell, Moon, Sun, Search, PanelLeft } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,11 @@ const PAGE_TITLES: Record<string, string> = {
   "/settings": "Settings",
 };
 
-export function Navbar() {
+interface NavbarProps {
+  onOpenMobile: () => void;
+}
+
+export function Navbar({ onOpenMobile }: NavbarProps) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
 
@@ -24,7 +28,17 @@ export function Navbar() {
     )?.[1] ?? "Opportunity Tracker";
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-border bg-background/80 px-6 backdrop-blur-sm">
+    <header className="flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 sm:px-6 backdrop-blur-sm">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="lg:hidden"
+        aria-label="Open navigation"
+        onClick={onOpenMobile}
+      >
+        <PanelLeft className="h-4 w-4" />
+      </Button>
+
       {/* Page Title */}
       <h1 className="text-base font-semibold text-foreground">{title}</h1>
 
